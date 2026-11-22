@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+data/
+demo/
+hasil/
+*.cs8
+*.cs8.part
