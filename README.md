@@ -1,10 +1,10 @@
 # Case A — Deteksi Kehadiran dan Gerakan dengan Wi-Fi CSI
 
-HackRF One merekam sampel I/Q dari Wi-Fi kelompok. Skrip mencari preamble OFDM, mengoreksi CFO, dan menghitung CSI pada 52 subcarrier. Dari hasilnya, kalian membandingkan CSI dengan RSSI untuk mendeteksi gerakan dan melihat apakah orang yang duduk diam bisa dibedakan dari ruangan kosong.
+Kedua laptop tersambung ke hotspot HP yang sama. HackRF One merekam sampel I/Q dari trafik Wi-Fi itu. Skrip mencari preamble OFDM, mengoreksi CFO, dan menghitung CSI pada 52 subcarrier. Dari hasilnya, kalian membandingkan CSI dengan RSSI untuk mendeteksi gerakan dan melihat apakah orang yang duduk diam bisa dibedakan dari ruangan kosong.
 
 ## 1. Pasang alat dan jalankan demo
 
-Siapkan satu HackRF One dengan antena sesuai pita 2,4 atau 5 GHz, satu router kelompok, dan dua laptop dengan Python 3.10 atau lebih baru. Pada laptop yang merekam, gunakan kabel USB data dan penyimpanan yang bisa menulis sekitar **40 MB/s**.
+Siapkan satu HP dengan fitur hotspot, dua laptop dengan Python 3.10 atau lebih baru, dan satu HackRF One dengan antena sesuai pita hotspot. Pada laptop yang merekam, gunakan kabel USB data dan penyimpanan yang bisa menulis sekitar **40 MB/s**.
 
 Kalau belum punya proyek ini di laptop, ambil dari GitHub:
 
@@ -42,23 +42,27 @@ Di langkah berikutnya, ganti `python` dengan `.\.venv\Scripts\python.exe` jika l
 
 Demo menguji ekstraksi dari CS8 sintetis dengan CFO yang diketahui, lalu membuat grafik dan evaluasi untuk 12 rekaman CSI simulasi. Hasilnya ada di `demo/hasil/`. Gunakan data pengukuran sendiri untuk laporan.
 
-## 2. Siapkan ruangan dan sumber Wi-Fi
+## 2. Nyalakan hotspot dan jalankan trafik uji
 
-1. Tempatkan router dan HackRF sekitar **3–5 m** terpisah pada ketinggian sekitar **1 m**. Bayangkan garis lurus antara kedua antena. Itulah jalur langsung (*line of sight* atau LOS). Tempel selotip di lantai tepat di bawah garis itu agar posisi duduk dan lintasan jalan mudah diulang.
-2. Kunci Wi-Fi router di satu kanal berlebar **20 MHz**. Contoh di bawah memakai **kanal 36 (5180 MHz)**. Jika memakai 2,4 GHz, kanal 1, 6, dan 11 masing-masing berada di 2412, 2437, dan 2462 MHz. Pada 2,4 GHz, pastikan trafik menghasilkan frame OFDM dengan L-LTF yang valid. Beacon 802.11b tidak menyediakan L-LTF.
-3. Gunakan router kelompok dan ruangan yang diizinkan dosen. HackRF bekerja dalam mode terima. Pertahankan kanal, gain, posisi perangkat, arah antena, dan sumber paket selama seluruh pengujian. Gunakan kode subjek seperti `P1` dengan persetujuan subjek sesuai modul. Saat merekam kondisi kosong, operasikan alat dari luar area pengujian.
+1. Nyalakan hotspot HP kelompok dan sambungkan **kedua laptop ke hotspot yang sama**. Pasang HackRF lewat USB ke laptop penerima. Pengiriman UDP berlangsung lewat jaringan lokal hotspot.
+2. Letakkan HP dan antena HackRF sekitar **3–5 m** terpisah pada ketinggian sekitar **1 m**. Tempel selotip di lantai di bawah garis lurus HP–HackRF. Garis itu adalah jalur langsung (*line of sight* atau LOS) jika paket yang dianalisis berasal dari HP. Pertahankan posisi HP, kedua laptop, dan antena selama pengujian.
+3. Jika HP menyediakan pengaturan pita, coba **5 GHz** dengan antena yang sesuai. **2,4 GHz** juga bisa dipakai jika pilot menemukan cukup paket OFDM dengan L-LTF valid. Gunakan ruangan yang diizinkan dosen. HackRF bekerja dalam mode terima. Gunakan kode subjek seperti `P1` dengan persetujuan subjek sesuai modul. Saat merekam kondisi kosong, operasikan alat dari luar area pengujian.
+
+### Cari IPv4 penerima dan frekuensi hotspot
+
+- **IPv4** diambil dari antarmuka Wi-Fi **laptop penerima**. Di Linux, jalankan `ip -4 -brief addr`. Di Windows, jalankan `ipconfig` dan lihat bagian Wi-Fi. Contoh di bawah memakai `192.168.1.24`. Ganti dengan alamat yang muncul di laptop kalian.
+- **Frekuensi** diambil dari kanal utama hotspot. Di Linux, jalankan `iw dev` untuk melihat nama antarmuka Wi-Fi lalu jalankan `iw dev wlp2s0 link`, dengan mengganti `wlp2s0` sesuai nama antarmuka kalian. Pakai angka setelah `freq:` dalam MHz. Di Windows, `netsh wlan show interfaces` menampilkan kanal koneksi. Contoh kanal 1, 6, dan 11 pada 2,4 GHz masing-masing **2412, 2437, dan 2462 MHz**. Kanal 36 pada 5 GHz adalah **5180 MHz**.
+- Jika hotspot memilih kanal otomatis, periksa frekuensinya lagi setelah hotspot dinyalakan ulang atau perangkat tersambung ulang. Pakai frekuensi kanal utama dan pertahankan kanal yang sama untuk rekaman yang dibandingkan.
 
 ### Buka tiga terminal
 
-Hubungkan laptop perekam ke **Wi-Fi router**, lalu hubungkan laptop pengirim ke **port LAN router lewat Ethernet**. Pasang HackRF lewat USB ke laptop perekam. Dengan susunan ini, router mengirim datagram lewat udara ke laptop perekam, dan HackRF merekam sinyal Wi-Fi tersebut.
-
 | Terminal | Perangkat | Dipakai untuk |
 |---|---|---|
-| **A** | Laptop perekam yang tersambung Wi-Fi | Menerima datagram UDP dengan `trafik terima`. |
-| **B** | Laptop pengirim yang tersambung Ethernet | Mengirim datagram UDP dengan `trafik kirim`. |
+| **A** | Laptop penerima yang tersambung ke hotspot | Menerima datagram UDP dengan `trafik terima`. |
+| **B** | Laptop pengirim yang tersambung ke hotspot yang sama | Mengirim datagram UDP dengan `trafik kirim`. |
 | **C** | Laptop perekam yang tersambung ke HackRF | Merekam sinyal, mengekstrak CSI, dan membuat hasil analisis. |
 
-Cari **alamat IPv4 antarmuka Wi-Fi laptop perekam** dari detail koneksi Wi-Fi. Di Linux, bisa pakai `ip -4 -brief addr`. Contoh di bawah memakai `192.168.1.24`. Ganti alamat itu pada **kedua** perintah.
+Gunakan **IPv4 laptop penerima pada kedua perintah**. A dan C dibuka di laptop yang sama.
 
 1. Di **Terminal A**, jalankan perintah ini dan tunggu tulisan `Mendengarkan UDP`.
 
@@ -74,16 +78,16 @@ python case_a.py trafik kirim --ip 192.168.1.24 --durasi 270 --pps 40
 
 3. Biarkan A dan B berjalan, lalu pakai **Terminal C** untuk bagian 3 dan 4. Ketika muncul `Datagram kirim: …` di B atau `Datagram terima: …` di A dan prompt shell kembali, prosesnya sudah selesai. Untuk mulai lagi, hentikan proses lama yang masih berjalan dengan **Ctrl+C di A atau B**, lalu jalankan ulang **A dulu, baru B**.
 
-Kalau hitungan akhir di A nol, cek IPv4 klien, firewall UDP port 5005, serta apakah kedua laptop ada di jaringan router yang sama. Jika hanya punya hotspot HP, kedua laptop bisa memakai Wi-Fi hotspot selama bisa saling terhubung. Pada setup ini ada beberapa pemancar lewat udara, jadi gunakan pilot untuk memilih kelompok paket yang konsisten.
+Untuk uji koneksi cepat sebelum merekam, gunakan perintah yang sama dengan `--durasi 20` di A dan `--durasi 10` di B. Setelah selesai, pastikan hitungan `Datagram terima` di A lebih dari nol, lalu mulai ulang dengan durasi normal. Jika hasilnya nol, cek kembali IPv4 Wi-Fi penerima, izin firewall untuk UDP port 5005 di jaringan uji, dan pengaturan isolasi klien hotspot jika tersedia. Jika HP memblokir komunikasi antarperangkat, coba hotspot HP lain.
 
 **40 datagram/s** adalah setelan Terminal B. Target Case A adalah **minimal 20 paket CSI terpilih/s** pada hasil ekstraksi di Terminal C.
 
 ## 3. Kalibrasi dan uji satu rekaman pendek
 
-1. Dengan A dan B masih berjalan, rekam **lima detik di Terminal C**. Ganti `5180` sesuai frekuensi kanal router. Ekstrak dari nama file yang tercetak setelah `Tersimpan`:
+1. Dengan A dan B masih berjalan, rekam **lima detik di Terminal C**. Ganti `5180` dengan frekuensi kanal utama hotspot dalam MHz. Ekstrak dari nama file yang tercetak setelah `Tersimpan`:
 
 ```bash
-python case_a.py rekam --raw data/pilot --sesi pilot --subjek none --skenario kosong --freq-mhz 5180 --durasi 5 --lokasi "Ruang kelas" --sumber router-kelompok --lna 32 --vga 26
+python case_a.py rekam --raw data/pilot --sesi pilot --subjek none --skenario kosong --freq-mhz 5180 --durasi 5 --lokasi "Ruang kelas" --sumber hotspot-hp --lna 32 --vga 26
 python case_a.py ekstrak data/pilot/A_pilot_none_kosong.cs8 --csi data/pilot-csi
 ```
 
@@ -95,9 +99,9 @@ Periksa tiga angka dari terminal:
 | Paket per detik | Target akhir minimal 20 paket/s **setelah** memilih pemancar. |
 | Clipping | Persentase sampel yang menyentuh batas ADC sebaiknya mendekati nol. Jika signifikan, turunkan gain dan ulangi pilot. |
 
-2. Untuk mendapat pembanding, **hentikan trafik uji di B dengan Ctrl+C** dan biarkan router tetap menyala. Di C, ulangi `rekam` dengan `--sesi hening` dan setelan lain yang sama. Ekstrak file `data/pilot/A_hening_none_kosong.cs8` dengan `--csi data/pilot-hening-csi`. Jika tidak ada paket valid pada pilot hening, terminal tetap menampilkan ringkasan.
+2. Untuk mendapat pembanding, **hentikan trafik uji di B dengan Ctrl+C** dan biarkan hotspot tetap menyala. Di C, ulangi `rekam` dengan `--sesi hening` dan setelan lain yang sama. Ekstrak file `data/pilot/A_hening_none_kosong.cs8` dengan `--csi data/pilot-hening-csi`. Jika tidak ada paket valid pada pilot hening, terminal tetap menampilkan ringkasan.
 
-3. Bandingkan baris `Kelompok CFO (kHz: paket)`. Pilih kelompok CFO yang konsisten dan jumlah paketnya bertambah saat trafik dinyalakan. CFO membantu memilih sumber, tapi dua perangkat bisa punya CFO mirip. Jika kelompok paket sulit dipisahkan, cari kanal kelompok yang lebih sepi dan ulangi pilot.
+3. Bandingkan baris `Kelompok CFO (kHz: paket)`. Saat kedua laptop memakai Wi-Fi, HackRF bisa menangkap paket dari HP dan laptop pengirim. Pilih satu kelompok CFO yang konsisten dan bertambah saat trafik uji aktif. CFO saja belum memastikan siapa pemancarnya. Jika paket kedua perangkat sulit dipisahkan, ulangi pilot pada pita atau kanal yang lebih sepi jika tersedia. Untuk skenario LOS, gunakan garis dari perangkat yang menjadi sumber paket terpilih ke HackRF. Kalau identitas sumber belum pasti, catat keterbatasan itu di laporan.
 
 4. Coba filter CFO pada rekaman pilot saat trafik aktif. Misalnya jika pusatnya **−8 kHz**, masukkan **−8000 Hz**:
 
@@ -119,7 +123,7 @@ Setiap ID sesi (`s1`, `s2`, dan `s3`) memuat empat rekaman berdurasi minimal 30 
 | `jalan_dinding` | Satu orang berjalan berulang di dekat dinding tanpa melintasi LOS. |
 
 1. Mulai ulang trafik di **A lalu B** setiap kali akan memulai sesi baru. Empat rekaman dalam satu sesi memerlukan 120 detik, ditambah waktu menyiapkan posisi dan mengekstrak data.
-2. Di **Terminal C**, tempel blok Bash di bawah. Jalankan dulu dengan `sesi=s1`, lalu ulangi bloknya dengan `sesi=s2` dan `sesi=s3` setelah tiap sesi selesai. Ganti frekuensi, CFO, gain, dan filter dengan nilai yang dipakai pada pilot. Ubah nama lokasi sesuai tempat uji.
+2. Di **Terminal C**, tempel blok Bash di bawah. Jalankan dulu dengan `sesi=s1`, lalu ulangi bloknya dengan `sesi=s2` dan `sesi=s3` setelah tiap sesi selesai. Ganti frekuensi, CFO, gain, dan filter dengan nilai yang dipakai pada pilot. Ubah lokasi sesuai tempat uji. Isi `sumber` dengan perangkat yang dipilih saat pilot, atau pakai `kelompok-cfo-pilot` jika baru kelompok CFO-nya yang diketahui. Gunakan label yang sama di setiap sesi.
 
 ```bash
 sesi=s1
@@ -129,6 +133,7 @@ lna=32
 vga=26
 cfo_tol=4000
 ambang_db=10
+sumber=hotspot-hp
 
 for skenario in kosong diam jalan_los jalan_dinding; do
   subjek=P1
@@ -137,7 +142,7 @@ for skenario in kosong diam jalan_los jalan_dinding; do
 
   python case_a.py rekam --sesi "$sesi" --subjek "$subjek" \
     --skenario "$skenario" --freq-mhz "$freq" --durasi 30 \
-    --lokasi "Ruang kelas" --sumber router-kelompok \
+    --lokasi "Ruang kelas" --sumber "$sumber" \
     --lna "$lna" --vga "$vga" || break
 
   python case_a.py ekstrak "data/raw/A_${sesi}_${subjek}_${skenario}.cs8" \
@@ -158,7 +163,7 @@ Jika CS8 sudah tersimpan tetapi ekstraksi gagal, ulangi perintah `ekstrak` untuk
 Kalau memakai **PowerShell** atau ingin menjalankan satu skenario saja, ini contoh untuk `s1/diam`. Sesuaikan opsi dengan hasil pilot. Ganti label skenario pada kedua perintah setiap kali berpindah. Untuk `kosong`, ganti juga subjek dari `P1` menjadi `none`.
 
 ```powershell
-python case_a.py rekam --sesi s1 --subjek P1 --skenario diam --freq-mhz 5180 --durasi 30 --lokasi "Ruang kelas" --sumber router-kelompok --lna 32 --vga 26
+python case_a.py rekam --sesi s1 --subjek P1 --skenario diam --freq-mhz 5180 --durasi 30 --lokasi "Ruang kelas" --sumber hotspot-hp --lna 32 --vga 26
 python case_a.py ekstrak "data/raw/A_s1_P1_diam.cs8" --cfo-hz -8000 --cfo-tol-hz 4000 --ambang-db 10
 ```
 
