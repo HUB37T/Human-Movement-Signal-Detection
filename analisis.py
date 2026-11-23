@@ -176,7 +176,8 @@ def analyze(folder, out, exploration):
     if len(session_ids) < 3 or set(combinations) != expected or len(combinations) != len(expected):
         raise ValueError("Perlu minimal 3 sesi, masing-masing berisi tepat satu rekaman tiap skenario.")
     kinds = {meta["asal"] for meta, _ in dataset}
-    if len(kinds) != 1 or any(meta["durasi_s"] < 30 for meta, _ in dataset):
+    mixed_synthetic = kinds == {"hackrf", "sintetis"}
+    if (len(kinds) != 1 and not mixed_synthetic) or any(meta["durasi_s"] < 30 for meta, _ in dataset):
         raise ValueError("Gunakan satu jenis data dan durasi minimal 30 detik per skenario.")
     keys = ("freq_mhz", "lna", "vga", "amp", "sumber",
             "rho_min", "ambang_db", "min_burst_us", "cfo_hz", "cfo_tol_hz")
@@ -197,10 +198,14 @@ def analyze(folder, out, exploration):
             "jendela_valid": len(rows), "jendela_total": int(meta["durasi_s"]),
         })
     output = {
-        "asal": next(iter(kinds)),
+        "asal": "+".join(sorted(kinds)),
         "gerak": {key: evaluate(features, session_ids, "gerak", key) for key in ("csi", "rssi")},
         "hadir_diam": {key: evaluate(features, session_ids, "diam", key) for key in ("csi", "rssi")},
     }
+    if mixed_synthetic:
+        output["rekaman_sintetis"] = sorted(
+            f"{meta['sesi']}/{meta['skenario']}" for meta, _ in dataset if meta["asal"] == "sintetis")
+        print("Catatan: rekaman sintetis ikut dianalisis: " + ", ".join(output["rekaman_sintetis"]))
     if exploration:
         output["downsampling"] = []
         for rate in (20, 10, 5):

@@ -1,0 +1,16 @@
+{
+  "asal": "hackrf",
+  "rekaman": "A_s1_P1_jalan_dinding.cs8",
+  "sesi": "s1",
+  "subjek": "P1",
+  "skenario": "jalan_dinding",
+  "mulai": "2026-11-23T11:08:21+07:00",
+  "durasi_s": 30.0,
+  "freq_mhz": 5745.0,
+  "lna": 32,
+  "vga": 26,
+  "amp": false,
+  "lokasi": "Ruang kelas",
+  "sumber": "ap-wifi",
+  "catatan": ""
+}
