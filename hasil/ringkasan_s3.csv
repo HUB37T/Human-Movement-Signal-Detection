@@ -1,0 +1,5 @@
+sesi,skenario,durasi_s,paket_valid,paket_per_s,celah_maks_s,jendela_valid,dasar
+s3,kosong,30,968,32.2667,0.3109,27,pengukuran HackRF S3
+s3,diam,30,1056.5,35.2167,0.1606,29,rata-rata S1 dan S2
+s3,jalan_los,30,915,30.5,0.2735,29,rata-rata S1 dan S2
+s3,jalan_dinding,30,920,30.6667,0.2322,29,rata-rata S1 dan S2

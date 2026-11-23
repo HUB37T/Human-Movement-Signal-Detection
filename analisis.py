@@ -18,8 +18,7 @@ GRID_HZ = 20
 LOW_PASS = butter(2, 8, fs=GRID_HZ, output="sos")
 
 
-def read_data(path):
-    metadata = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+def read_data(path, metadata):
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     values = np.array([
@@ -125,7 +124,7 @@ def evaluate(features, session_ids, task, feature):
 
 def export_csv(path, rows):
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -166,19 +165,26 @@ def plot_features(out, features, source):
     plt.close(fig)
 
 
-def analyze(folder, out, exploration):
-    dataset = [read_data(path) for path in sorted(folder.glob("*.csv"))]
-    if not dataset:
+def analyze(folder, out, exploration, sessions=None):
+    files = sorted(folder.glob("*.csv"))
+    if not files:
         raise ValueError(f"Belum ada CSV CSI di {folder}. Jalankan ekstrak terlebih dahulu.")
+    dataset = []
+    for path in files:
+        meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+        if sessions is None or meta["sesi"] in sessions:
+            dataset.append(read_data(path, meta))
     session_ids = sorted({meta["sesi"] for meta, _ in dataset})
+    if sessions is not None and set(sessions) != set(session_ids):
+        raise ValueError(f"Sesi tidak ditemukan: {', '.join(sorted(set(sessions) - set(session_ids)))}.")
     combinations = [(m["sesi"], m["skenario"]) for m, _ in dataset]
     expected = {(session, label) for session in session_ids for label in SKENARIO}
-    if len(session_ids) < 3 or set(combinations) != expected or len(combinations) != len(expected):
-        raise ValueError("Perlu minimal 3 sesi, masing-masing berisi tepat satu rekaman tiap skenario.")
+    min_sessions = 2 if sessions is not None else 3
+    if len(session_ids) < min_sessions or set(combinations) != expected or len(combinations) != len(expected):
+        raise ValueError(f"Perlu minimal {min_sessions} sesi, masing-masing dengan satu rekaman tiap skenario.")
     kinds = {meta["asal"] for meta, _ in dataset}
-    mixed_synthetic = kinds == {"hackrf", "sintetis"}
-    if (len(kinds) != 1 and not mixed_synthetic) or any(meta["durasi_s"] < 30 for meta, _ in dataset):
-        raise ValueError("Gunakan satu jenis data dan durasi minimal 30 detik per skenario.")
+    if kinds not in ({"hackrf"}, {"simulasi"}) or any(meta["durasi_s"] < 30 for meta, _ in dataset):
+        raise ValueError("Gunakan hanya rekaman HackRF atau data demo, dengan durasi minimal 30 detik per skenario.")
     keys = ("freq_mhz", "lna", "vga", "amp", "sumber",
             "rho_min", "ambang_db", "min_burst_us", "cfo_hz", "cfo_tol_hz")
     settings = {tuple(meta.get(k) for k in keys) for meta, _ in dataset}
@@ -198,14 +204,11 @@ def analyze(folder, out, exploration):
             "jendela_valid": len(rows), "jendela_total": int(meta["durasi_s"]),
         })
     output = {
-        "asal": "+".join(sorted(kinds)),
+        "asal": next(iter(kinds)),
+        "sesi_evaluasi": session_ids,
         "gerak": {key: evaluate(features, session_ids, "gerak", key) for key in ("csi", "rssi")},
         "hadir_diam": {key: evaluate(features, session_ids, "diam", key) for key in ("csi", "rssi")},
     }
-    if mixed_synthetic:
-        output["rekaman_sintetis"] = sorted(
-            f"{meta['sesi']}/{meta['skenario']}" for meta, _ in dataset if meta["asal"] == "sintetis")
-        print("Catatan: rekaman sintetis ikut dianalisis: " + ", ".join(output["rekaman_sintetis"]))
     if exploration:
         output["downsampling"] = []
         for rate in (20, 10, 5):
@@ -220,7 +223,7 @@ def analyze(folder, out, exploration):
     out.mkdir(parents=True, exist_ok=True)
     export_csv(out / "log_sesi.csv", logs)
     export_csv(out / "fitur.csv", [{k: v for k, v in row.items() if k != "profil"} for row in features])
-    (out / "metrik.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
+    (out / "metrik.json").write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8", newline="\n")
     plot_heatmap(out, dataset)
     plot_features(out, features, output["asal"])
     for task in ("gerak", "hadir_diam"):

@@ -197,6 +197,18 @@ Satu rekaman 30 detik memerlukan sekitar **1,2 GB**, sehingga 12 rekaman memerlu
 
 ## 5. Buat grafik dan hitung hasil
 
+**Untuk dataset yang ada di repo ini**, S1 dan S2 lengkap, sedangkan S3 hanya memiliki pengukuran asli untuk skenario kosong. Jalankan evaluasi dua sesi lengkap dari Terminal C:
+
+```bash
+python case_a.py analisis --sesi s1 s2 --eksplorasi
+```
+
+Hasil di `hasil/` menggunakan delapan rekaman HackRF dari S1 dan S2. Ambang dilatih dari S1 dan diuji di S2, lalu giliran dibalik. File sintetis S3 dari pengolahan sebelumnya disimpan bersama data awalnya di `data/csi/`. Ringkasan S3 untuk laporan ada di `hasil/ringkasan_s3.csv`. Baris kosong memakai pengukuran S3 yang asli. Baris diam, jalan melintasi LOS, dan jalan dekat dinding berisi rata-rata pengukuran S1 dan S2 per skenario. Ringkasan ini berada di luar evaluasi akurasi, FPR, dan FNR.
+
+Log perekaman S2 mencatat trafik UDP satu arah dari terminal A ke B. Catat perbedaan arah trafik itu saat membahas hasil antar sesi.
+
+### Jika semua tiga sesi sudah direkam
+
 Setelah **12 CSV dan 12 JSON** dari `s1`, `s2`, dan `s3` tersedia di `data/csi/`, jalankan ini di **Terminal C**:
 
 ```bash
